@@ -135,7 +135,8 @@ async function runCli() {
       modelMap,
       {
         summarizeTools: cliConfig.summarizeTools,
-      }
+      },
+      cliConfig.googleApiKey
     );
 
     // Run Claude Code with proxy

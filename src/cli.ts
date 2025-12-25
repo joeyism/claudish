@@ -261,6 +261,9 @@ export async function parseArgs(args: string[]): Promise<ClaudishConfig> {
     // claude-runner.ts automatically sets a placeholder if not provided (see line 138)
     // This allows single-variable setup - users only need OPENROUTER_API_KEY
     config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+
+    // Google API key (optional) - for direct Gemini access
+    config.googleApiKey = process.env.GOOGLE_API_KEY;
   }
 
   // Set default for quiet mode if not explicitly set
