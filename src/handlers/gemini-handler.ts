@@ -121,6 +121,7 @@ export class GeminiHandler implements ModelHandler {
     let isClosed = false;
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
+    const self = this;
 
     return c.body(
       new ReadableStream({
@@ -150,7 +151,7 @@ export class GeminiHandler implements ModelHandler {
               type: "message",
               role: "assistant",
               content: [],
-              model: this.targetModel,
+              model: self.targetModel,
               stop_reason: null,
               stop_sequence: null,
               usage: { input_tokens: 100, output_tokens: 1 },
@@ -215,7 +216,17 @@ export class GeminiHandler implements ModelHandler {
                       // Handle function calls (Gemini format)
                       if (part.functionCall) {
                         const { name, args } = part.functionCall;
-                        const toolId = `toolu_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                        const thought_signature = part.thoughtSignature;
+
+                        // Encode thought_signature in tool ID for round-trip preservation
+                        // Format: toolu_<random>__ts_<urlencoded_thought_signature>
+                        // IMPORTANT: thought_signature must be preserved exactly as received
+                        let toolId = `toolu_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                        if (thought_signature) {
+                          const sigEncoded = encodeURIComponent(thought_signature);
+                          toolId = `${toolId}__ts_${sigEncoded}`;
+                        }
+
                         const toolIdx = curIdx++;
 
                         // Start tool use block
@@ -245,7 +256,7 @@ export class GeminiHandler implements ModelHandler {
                           index: toolIdx,
                         });
 
-                        tools.set(toolIdx, { id: toolId, name, args });
+                        tools.set(toolIdx, { id: toolId, name, args, thought_signature });
                       }
                     }
 
@@ -309,14 +320,14 @@ export class GeminiHandler implements ModelHandler {
 
             // Update token tracking
             if (usage) {
-              this.sessionInputTokens = usage.input_tokens;
-              this.sessionOutputTokens += usage.output_tokens;
-              this.writeTokenFile(this.sessionInputTokens, this.sessionOutputTokens);
+              self.sessionInputTokens = usage.input_tokens;
+              self.sessionOutputTokens += usage.output_tokens;
+              self.writeTokenFile(self.sessionInputTokens, self.sessionOutputTokens);
 
               // Calculate cost (example rates - update based on actual Gemini pricing)
               const inputCost = (usage.input_tokens / 1_000_000) * 0.15; // $0.15 per 1M input tokens
               const outputCost = (usage.output_tokens / 1_000_000) * 0.60; // $0.60 per 1M output tokens
-              this.sessionTotalCost += inputCost + outputCost;
+              self.sessionTotalCost += inputCost + outputCost;
             }
 
             controller.close();
@@ -335,7 +346,7 @@ export class GeminiHandler implements ModelHandler {
               isClosed = true;
             }
           }
-        }.bind(this), // Bind to preserve 'this' context
+        },
 
         cancel() {
           isClosed = true;
